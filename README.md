@@ -130,7 +130,7 @@ Treehouse manages a **pool of git worktrees** per repository, stored under `~/.t
 
 - **Detached HEAD** — worktrees use detached HEAD mode, reset to whichever of the local or remote default branch is further ahead, avoiding branch name conflicts entirely.
 - **No daemon** — all operations are inline CLI commands. No background processes, no state to get corrupted.
-- **In-use detection** — treehouse scans running processes to determine which worktrees are in-use. Usage state is never persisted, so it's always accurate.
+- **In-use detection** — treehouse scans running processes and short-lived owner reservations to determine which worktrees are in-use. Reservations are persisted only while `get` and `destroy` lifecycle work is running.
 
 ## CLI Reference
 
@@ -154,7 +154,7 @@ Treehouse manages a **pool of git worktrees** per repository, stored under `~/.t
 
 ## Configuration
 
-Create a config file with `treehouse init`, or add one manually:
+Create a repo config file with `treehouse init`, or add one manually:
 
 **Repo-level:** `treehouse.toml` in the repository root
 
@@ -165,7 +165,26 @@ Create a config file with `treehouse init`, or add one manually:
 max_trees = 16
 ```
 
-The repo-level config takes precedence. If no config is found, the default pool size is 16.
+The repo-level config takes precedence for repo-safe settings.
+If no config is found, the default pool size is 16.
+
+### Hooks
+
+You can run commands automatically at worktree lifecycle points by adding a `[hooks]` section to the user-level config at `~/.config/treehouse/config.toml`.
+Hooks in repo-level `treehouse.toml` are ignored for safety.
+
+```toml
+[hooks]
+post_create = ["./scripts/setup-venv.sh"]
+pre_destroy = ["./scripts/teardown.sh"]
+```
+
+- `post_create` runs after a worktree is provisioned or reset and right before `treehouse get` hands it to you.
+- `pre_destroy` runs before a worktree is removed by `treehouse destroy` (and `treehouse destroy --all`).
+
+Commands in each list run sequentially in the worktree directory, via the OS shell (`/bin/sh -c` on Linux/macOS, `%COMSPEC% /c` on Windows).
+If a command exits non-zero, treehouse logs the command, exit code, and stderr, then continues with the remaining commands.
+A failing hook does not fail the overall `get` or `destroy` operation.
 
 ## Development
 
