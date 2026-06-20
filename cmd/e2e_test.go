@@ -285,6 +285,73 @@ func extractWorktreePath(stderr, homeDir string) string {
 	return path
 }
 
+func containsRawGitFailure(output string) bool {
+	return strings.Contains(output, "fatal:") ||
+		strings.Contains(output, "not a git repository") ||
+		strings.Contains(output, "Could not read from remote repository") ||
+		strings.Contains(output, "does not appear to be a git repository")
+}
+
+func setupMixedStaleAndOrphanedWorktrees(t *testing.T) (repoDir, homeDir, stalePath, orphanPath string) {
+	t.Helper()
+
+	repoDir, homeDir = setupTestRepo(t)
+	env := []string{"SHELL=" + exitShellBin}
+
+	_, getErr, code := runTreehouse(t, repoDir, homeDir, env, "get")
+	if code != 0 {
+		t.Fatalf("first get failed (code %d): %s", code, getErr)
+	}
+	stalePath = extractWorktreePath(getErr, homeDir)
+	if stalePath == "" {
+		t.Fatal("could not extract first worktree path")
+	}
+
+	dirtyPath := filepath.Join(stalePath, "dirty.txt")
+	if err := os.WriteFile(dirtyPath, []byte("dirty\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, getErr, code = runTreehouse(t, repoDir, homeDir, env, "get")
+	if code != 0 {
+		t.Fatalf("second get failed (code %d): %s", code, getErr)
+	}
+	orphanPath = extractWorktreePath(getErr, homeDir)
+	if orphanPath == "" {
+		t.Fatal("could not extract second worktree path")
+	}
+	if orphanPath == stalePath {
+		t.Fatalf("expected dirty first worktree to force a second worktree, got %s", orphanPath)
+	}
+
+	if err := os.Remove(dirtyPath); err != nil {
+		t.Fatal(err)
+	}
+	removeWorktreeBackingGitDir(t, orphanPath)
+
+	return repoDir, homeDir, stalePath, orphanPath
+}
+
+func removeWorktreeBackingGitDir(t *testing.T, wtPath string) {
+	t.Helper()
+
+	data, err := os.ReadFile(filepath.Join(wtPath, ".git"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	gitDir, ok := strings.CutPrefix(strings.TrimSpace(string(data)), "gitdir: ")
+	if !ok {
+		t.Fatalf("expected linked worktree .git file, got %q", data)
+	}
+	gitDir = filepath.FromSlash(strings.TrimSpace(gitDir))
+	if !filepath.IsAbs(gitDir) {
+		gitDir = filepath.Join(wtPath, gitDir)
+	}
+	if err := os.RemoveAll(gitDir); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // --- Tests ---
 
 func TestInit(t *testing.T) {
@@ -691,6 +758,185 @@ func TestPruneAllDryRunAndYesAcrossPoolsFromAnywhere(t *testing.T) {
 		if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
 			t.Fatalf("expected worktree to be removed after prune --all --yes, stat err: %v", err)
 		}
+	}
+}
+
+func TestPruneMixedStaleAndSkippedOrphanPrintsOrphanHints(t *testing.T) {
+	tests := []struct {
+		name         string
+		args         []string
+		fromOutside  bool
+		removesStale bool
+		wants        []string
+	}{
+		{
+			name: "repo dry run",
+			args: []string{"prune"},
+			wants: []string{
+				"would prune 1 stale worktree",
+				"orphaned (backing repository missing)",
+				"Re-run with --yes to delete these worktrees.",
+				"Re-run with --prune-orphans to include true orphans in the dry run; add --yes to delete them.",
+			},
+		},
+		{
+			name:         "repo yes",
+			args:         []string{"prune", "--yes"},
+			removesStale: true,
+			wants: []string{
+				"Pruned 1 stale worktree",
+				"orphaned (backing repository missing)",
+				"Re-run with --prune-orphans --yes to delete true orphans whose backing repository is missing.",
+			},
+		},
+		{
+			name:        "global dry run",
+			args:        []string{"prune", "--all"},
+			fromOutside: true,
+			wants: []string{
+				"would prune 1 stale worktree across 1 pool",
+				"orphaned (backing repository missing)",
+				"Re-run with --all --yes to delete these worktrees.",
+				"Re-run with --all --prune-orphans to include true orphans in the dry run; add --yes to delete them.",
+			},
+		},
+		{
+			name:         "global yes",
+			args:         []string{"prune", "--all", "--yes"},
+			fromOutside:  true,
+			removesStale: true,
+			wants: []string{
+				"Pruned 1 stale worktree across 1 pool",
+				"orphaned (backing repository missing)",
+				"Re-run with --all --prune-orphans --yes to delete true orphans whose backing repository is missing.",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repoDir, homeDir, stalePath, orphanPath := setupMixedStaleAndOrphanedWorktrees(t)
+			workDir := repoDir
+			if tt.fromOutside {
+				workDir = t.TempDir()
+			}
+
+			pruneOut, pruneErr, code := runTreehouseFromDir(t, repoDir, workDir, homeDir, nil, tt.args...)
+			if code != 0 {
+				t.Fatalf("%s failed (code %d): %s", strings.Join(tt.args, " "), code, pruneErr)
+			}
+			for _, want := range tt.wants {
+				if !strings.Contains(pruneOut, want) {
+					t.Fatalf("expected %q in stdout:\n%s\nstderr:\n%s", want, pruneOut, pruneErr)
+				}
+			}
+
+			if tt.removesStale {
+				if _, err := os.Stat(stalePath); !os.IsNotExist(err) {
+					t.Fatalf("expected stale worktree to be removed, stat err: %v", err)
+				}
+			} else if _, err := os.Stat(stalePath); err != nil {
+				t.Fatalf("dry run removed worktree %s: %v", stalePath, err)
+			}
+			if _, err := os.Stat(orphanPath); err != nil {
+				t.Fatalf("%s removed orphan %s: %v", strings.Join(tt.args, " "), orphanPath, err)
+			}
+		})
+	}
+}
+
+func TestPruneAllReportsOrphanWithoutRawGitErrorsAndPrunesOnlyWithExplicitFlag(t *testing.T) {
+	repoDir, homeDir := setupTestRepo(t)
+	env := []string{"SHELL=" + exitShellBin}
+
+	_, getErr, code := runTreehouse(t, repoDir, homeDir, env, "get")
+	if code != 0 {
+		t.Fatalf("get failed (code %d): %s", code, getErr)
+	}
+	wtPath := extractWorktreePath(getErr, homeDir)
+	if wtPath == "" {
+		t.Fatal("could not extract worktree path")
+	}
+	if err := os.RemoveAll(repoDir); err != nil {
+		t.Fatalf("RemoveAll repo failed: %v", err)
+	}
+
+	outsideDir := t.TempDir()
+	pruneOut, pruneErr, code := runTreehouseFromDir(t, repoDir, outsideDir, homeDir, nil, "prune", "--all")
+	if code != 0 {
+		t.Fatalf("prune --all failed on orphan (code %d): %s", code, pruneErr)
+	}
+	if !strings.Contains(pruneOut, "orphaned (backing repository missing)") || !strings.Contains(pruneOut, "content could not be verified") {
+		t.Fatalf("expected clean orphan skip, got stdout:\n%s\nstderr:\n%s", pruneOut, pruneErr)
+	}
+	if containsRawGitFailure(pruneOut) || containsRawGitFailure(pruneErr) {
+		t.Fatalf("default orphan output leaked raw git failure, stdout:\n%s\nstderr:\n%s", pruneOut, pruneErr)
+	}
+	if _, err := os.Stat(wtPath); err != nil {
+		t.Fatalf("plain prune removed orphan %s: %v", wtPath, err)
+	}
+
+	pruneOut, pruneErr, code = runTreehouseFromDir(t, repoDir, outsideDir, homeDir, nil, "prune", "--all", "--prune-orphans")
+	if code != 0 {
+		t.Fatalf("prune --all --prune-orphans failed on orphan dry run (code %d): %s", code, pruneErr)
+	}
+	if !strings.Contains(pruneOut, "would prune 1 stale/orphaned worktree") || !strings.Contains(pruneOut, "content could not be verified") {
+		t.Fatalf("expected orphan dry-run candidate, got stdout:\n%s\nstderr:\n%s", pruneOut, pruneErr)
+	}
+	if _, err := os.Stat(wtPath); err != nil {
+		t.Fatalf("orphan dry run removed %s: %v", wtPath, err)
+	}
+
+	pruneOut, pruneErr, code = runTreehouseFromDir(t, repoDir, outsideDir, homeDir, nil, "prune", "--all", "--prune-orphans", "--yes")
+	if code != 0 {
+		t.Fatalf("prune --all --prune-orphans --yes failed (code %d): %s", code, pruneErr)
+	}
+	if !strings.Contains(pruneOut, "Pruned 1 stale/orphaned worktree") || !strings.Contains(pruneOut, "content could not be verified") {
+		t.Fatalf("expected orphan prune summary, got stdout:\n%s\nstderr:\n%s", pruneOut, pruneErr)
+	}
+	if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
+		t.Fatalf("expected orphan to be removed after explicit prune, stat err: %v", err)
+	}
+}
+
+func TestPruneAllDoesNotDeleteOriginUnreachableWithPruneOrphans(t *testing.T) {
+	repoDir, homeDir := setupTestRepo(t)
+	env := []string{"SHELL=" + exitShellBin}
+
+	_, getErr, code := runTreehouse(t, repoDir, homeDir, env, "get")
+	if code != 0 {
+		t.Fatalf("get failed (code %d): %s", code, getErr)
+	}
+	wtPath := extractWorktreePath(getErr, homeDir)
+	if wtPath == "" {
+		t.Fatal("could not extract worktree path")
+	}
+	remoteDir := filepath.Join(filepath.Dir(repoDir), "remote.git")
+	if err := os.RemoveAll(remoteDir); err != nil {
+		t.Fatalf("RemoveAll remote failed: %v", err)
+	}
+
+	outsideDir := t.TempDir()
+	pruneOut, pruneErr, code := runTreehouseFromDir(t, repoDir, outsideDir, homeDir, nil, "prune", "--all", "--prune-orphans", "--yes")
+	if code != 0 {
+		t.Fatalf("prune --all --prune-orphans --yes failed with unreachable origin (code %d): %s", code, pruneErr)
+	}
+	if !strings.Contains(pruneOut, "origin unreachable (cannot verify)") {
+		t.Fatalf("expected origin-unreachable skip, got stdout:\n%s\nstderr:\n%s", pruneOut, pruneErr)
+	}
+	if containsRawGitFailure(pruneOut) || containsRawGitFailure(pruneErr) {
+		t.Fatalf("default origin-unreachable output leaked raw git failure, stdout:\n%s\nstderr:\n%s", pruneOut, pruneErr)
+	}
+	if _, err := os.Stat(wtPath); err != nil {
+		t.Fatalf("origin-unreachable worktree was removed: %v", err)
+	}
+
+	verboseOut, verboseErr, code := runTreehouseFromDir(t, repoDir, outsideDir, homeDir, nil, "prune", "--all", "--verbose")
+	if code != 0 {
+		t.Fatalf("prune --all --verbose failed with unreachable origin (code %d): %s", code, verboseErr)
+	}
+	if !strings.Contains(verboseOut, "detail: refresh origin before prune") {
+		t.Fatalf("expected verbose origin diagnostic detail, got stdout:\n%s\nstderr:\n%s", verboseOut, verboseErr)
 	}
 }
 
