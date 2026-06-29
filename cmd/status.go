@@ -12,6 +12,7 @@ import (
 
 	"github.com/kunchenguid/treehouse/v3/internal/config"
 	"github.com/kunchenguid/treehouse/v3/internal/pool"
+	"github.com/kunchenguid/treehouse/v3/internal/process"
 	"github.com/kunchenguid/treehouse/v3/internal/ui"
 	"github.com/kunchenguid/treehouse/v3/internal/vcs"
 )
@@ -37,6 +38,22 @@ type statusJSONWorktree struct {
 	LeaseHolder    string              `json:"lease_holder"`
 	LeasedAt       *time.Time          `json:"leased_at"`
 	Processes      []statusJSONProcess `json:"processes"`
+}
+
+// distinctTerminals returns the unique, non-empty controlling terminals (TTYs)
+// of the given processes, preserving first-seen order. The shell and the tools
+// running inside a worktree share one controlling terminal, so this collapses
+// to the single terminal a worktree is open in.
+func distinctTerminals(procs []process.ProcessInfo) []string {
+	seen := map[string]bool{}
+	var terms []string
+	for _, p := range procs {
+		if p.Terminal != "" && !seen[p.Terminal] {
+			seen[p.Terminal] = true
+			terms = append(terms, p.Terminal)
+		}
+	}
+	return terms
 }
 
 var statusCmd = &cobra.Command{
@@ -107,6 +124,9 @@ var statusCmd = &cobra.Command{
 			// "%-4s  %-11s  " = 4 + 2 + 11 + 2 = 19 chars before path
 			statusPad := strings.Repeat(" ", statusWidth-len(wt.Status))
 			line := fmt.Sprintf("%-4s  %s%s  %s", wt.Name, status, statusPad, ui.PrettyPath(wt.Path))
+			if terms := distinctTerminals(wt.Processes); len(terms) > 0 {
+				line += "  " + cyan(strings.Join(terms, ","))
+			}
 			if wt.Branch != "" {
 				line += fmt.Sprintf("  [%s]", wt.Branch)
 			}
