@@ -39,7 +39,7 @@ var returnCmd = &cobra.Command{
 			if dirty {
 				ok, err := ui.Confirm("Worktree has uncommitted changes. Clean and return?", true)
 				if err != nil || !ok {
-					fmt.Fprintln(os.Stderr, "🌳 Aborted.")
+					fmt.Fprintln(os.Stderr, "Aborted.")
 					return nil
 				}
 			}
@@ -55,7 +55,7 @@ var returnCmd = &cobra.Command{
 			return fmt.Errorf("failed to return worktree: %w", err)
 		}
 
-		fmt.Fprintln(os.Stderr, "🌳 Worktree returned to pool.")
+		fmt.Fprintln(os.Stderr, "Worktree returned to pool.")
 		return nil
 	},
 }

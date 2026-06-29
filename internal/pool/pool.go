@@ -74,7 +74,7 @@ func acquire(repoRoot, poolDir string, poolSize int, postCreate []string, opts a
 		return "", err
 	}
 
-	fmt.Fprintf(os.Stderr, "🌳 Setting up worktree...\n")
+	fmt.Fprintf(os.Stderr, "Setting up worktree...\n")
 	if git.HasRemote(repoRoot, "origin") {
 		if err := git.Fetch(repoRoot); err != nil {
 			return "", fmt.Errorf("fetch failed: %w", err)

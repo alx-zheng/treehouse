@@ -263,7 +263,7 @@ func gitCmdResult(t *testing.T, dir string, args ...string) (string, error) {
 // extractWorktreePath parses the worktree path from "treehouse get" stderr.
 // The output line looks like:
 //
-//	🌳 Entered worktree at ~/.treehouse/.../1/myrepo. Type 'exit' to return.
+//	Entered worktree at ~/.treehouse/.../1/myrepo. Type 'exit' to return.
 //
 // The path is pretty-printed with ~ for the home directory, so we un-prettify
 // it using homeDir.
