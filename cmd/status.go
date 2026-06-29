@@ -11,8 +11,25 @@ import (
 	"github.com/kunchenguid/treehouse/internal/config"
 	"github.com/kunchenguid/treehouse/internal/git"
 	"github.com/kunchenguid/treehouse/internal/pool"
+	"github.com/kunchenguid/treehouse/internal/process"
 	"github.com/kunchenguid/treehouse/internal/ui"
 )
+
+// distinctTerminals returns the unique, non-empty controlling terminals (TTYs)
+// of the given processes, preserving first-seen order. The shell and the tools
+// running inside a worktree share one controlling terminal, so this collapses
+// to the single terminal a worktree is open in.
+func distinctTerminals(procs []process.ProcessInfo) []string {
+	seen := map[string]bool{}
+	var terms []string
+	for _, p := range procs {
+		if p.Terminal != "" && !seen[p.Terminal] {
+			seen[p.Terminal] = true
+			terms = append(terms, p.Terminal)
+		}
+	}
+	return terms
+}
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
@@ -70,6 +87,9 @@ var statusCmd = &cobra.Command{
 			// "%-4s  %-11s  " = 4 + 2 + 11 + 2 = 19 chars before path
 			statusPad := strings.Repeat(" ", statusWidth-len(wt.Status))
 			line := fmt.Sprintf("%-4s  %s%s  %s", wt.Name, status, statusPad, ui.PrettyPath(wt.Path))
+			if terms := distinctTerminals(wt.Processes); len(terms) > 0 {
+				line += "  " + cyan(strings.Join(terms, ","))
+			}
 			if wt.Status == pool.StatusLeased && wt.LeaseHolder != "" {
 				line += fmt.Sprintf("  (held by %s)", wt.LeaseHolder)
 			}
