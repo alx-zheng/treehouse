@@ -9,11 +9,15 @@ import (
 )
 
 type ProcessInfo struct {
-	PID  int32
-	Name string
+	PID      int32
+	Name     string
+	Terminal string // controlling tty, e.g. "ttys003" ("" if none)
 }
 
 func (p ProcessInfo) String() string {
+	if p.Terminal != "" {
+		return fmt.Sprintf("%s (%d, %s)", p.Name, p.PID, p.Terminal)
+	}
 	return fmt.Sprintf("%s (%d)", p.Name, p.PID)
 }
 
@@ -75,8 +79,9 @@ func FindProcessesInWorktree(worktreePath string) ([]ProcessInfo, error) {
 		if rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))) {
 			name, _ := p.Name()
 			result = append(result, ProcessInfo{
-				PID:  p.Pid,
-				Name: name,
+				PID:      p.Pid,
+				Name:     name,
+				Terminal: terminalForPID(p.Pid), // controlling tty, "" if none
 			})
 		}
 	}
