@@ -11,6 +11,10 @@ import (
 
 var runningFromNixStore = updater.RunningFromNixStore
 
+// forkBuild names a locally patched build (set with -ldflags "-X .../cmd.forkBuild=<name>").
+// Self-update would replace it with the stock release and silently drop the patches.
+var forkBuild = ""
+
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update treehouse to the latest version",
@@ -18,6 +22,10 @@ var updateCmd = &cobra.Command{
 		if version == "dev" {
 			fmt.Println("Skipping update: running a dev build")
 			return nil
+		}
+
+		if forkBuild != "" {
+			return fmt.Errorf("this is a patched build (%s); a self-update would drop the patches. Rebase the fork onto the new release and rebuild it instead", forkBuild)
 		}
 
 		if runningFromNixStore() {
