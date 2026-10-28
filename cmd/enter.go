@@ -87,7 +87,7 @@ func enterRunE(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Fprintf(os.Stderr, "🌳 Entered worktree %s at %s. Type 'exit' to leave.\n", target.Name, ui.PrettyPath(target.Path))
+	fmt.Fprintf(os.Stderr, "Entered worktree %s at %s. Type 'exit' to leave.\n", target.Name, ui.PrettyPath(target.Path))
 
 	env := []string{
 		"TREEHOUSE_DIR=" + target.Path,
@@ -96,6 +96,6 @@ func enterRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintln(os.Stderr, "🌳 Left worktree. Pool state unchanged.")
+	fmt.Fprintln(os.Stderr, "Left worktree. Pool state unchanged.")
 	return nil
 }

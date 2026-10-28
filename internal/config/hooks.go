@@ -60,7 +60,7 @@ func warnRepoHooks(w io.Writer, path string, md toml.MetaData) {
 	if _, seen := warnedRepoHooks.LoadOrStore(path, true); seen {
 		return
 	}
-	fmt.Fprintf(w, "🌳 Warning: ignoring [hooks] in %s: %s\n", ui.PrettyPath(path), strings.Join(ignored, ", "))
+	fmt.Fprintf(w, "Warning: ignoring [hooks] in %s: %s\n", ui.PrettyPath(path), strings.Join(ignored, ", "))
 	fmt.Fprintf(w, "   Lifecycle hooks run only from %s; hooks in repo-level config are ignored for safety.\n", userConfigPathForDisplay())
 }
 

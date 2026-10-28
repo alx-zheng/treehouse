@@ -118,19 +118,19 @@ and return it by name.`,
 		// with nothing in the exit status to detect it.
 		if errors.Is(err, errReturnAbortedNonTTY) {
 			return withExitCode(ExitNotReturned, fmt.Errorf(
-				"🌳 worktree not returned: it has uncommitted changes and the confirmation could not be answered (stdin reached EOF); prune will not reclaim this slot. Use treehouse return --force %s to clean and return it",
+				"worktree not returned: it has uncommitted changes and the confirmation could not be answered (stdin reached EOF); prune will not reclaim this slot. Use treehouse return --force %s to clean and return it",
 				quoteReturnPath(target.path)))
 		}
 		if errors.Is(err, errReturnAborted) {
 			return withExitCode(ExitNotReturned, fmt.Errorf(
-				"🌳 worktree not returned: cleaning declined, so its uncommitted changes remain and prune will not reclaim this slot. Use treehouse return --force %s to clean and return it",
+				"worktree not returned: cleaning declined, so its uncommitted changes remain and prune will not reclaim this slot. Use treehouse return --force %s to clean and return it",
 				quoteReturnPath(target.path)))
 		}
 		if err != nil {
 			return fmt.Errorf("failed to return worktree: %w", err)
 		}
 
-		fmt.Fprintln(os.Stderr, "🌳 Worktree returned to pool.")
+		fmt.Fprintln(os.Stderr, "Worktree returned to pool.")
 		return nil
 	},
 }
@@ -271,7 +271,7 @@ func returnHeldWorktrees() error {
 	for _, wt := range worktrees {
 		if wt.Status == pool.StatusLeased && wt.LeaseHolder == pool.RecoveredLeaseHolder {
 			recovered++
-			fmt.Fprintf(os.Stderr, "🌳 Leaving %s at %s leased: it was recovered, so nothing proves it idle and it is only returned by name. Check it, then run: treehouse return %s\n", wt.Name, ui.PrettyPath(wt.Path), quoteReturnPath(wt.Path))
+			fmt.Fprintf(os.Stderr, "Leaving %s at %s leased: it was recovered, so nothing proves it idle and it is only returned by name. Check it, then run: treehouse return %s\n", wt.Name, ui.PrettyPath(wt.Path), quoteReturnPath(wt.Path))
 			continue
 		}
 		if returnableStatus(wt) {
@@ -280,19 +280,19 @@ func returnHeldWorktrees() error {
 		}
 		notHeld++
 		if wt.HeldOnlyByCwd {
-			fmt.Fprintf(os.Stderr, "🌳 Leaving %s at %s alone: you are standing in it and nobody holds it.\n", wt.Name, ui.PrettyPath(wt.Path))
+			fmt.Fprintf(os.Stderr, "Leaving %s at %s alone: you are standing in it and nobody holds it.\n", wt.Name, ui.PrettyPath(wt.Path))
 		}
 	}
 
 	if len(targets) == 0 && recovered == 0 {
-		fmt.Fprintf(os.Stderr, "🌳 No held worktrees to return (%d in the pool).\n", len(worktrees))
+		fmt.Fprintf(os.Stderr, "No held worktrees to return (%d in the pool).\n", len(worktrees))
 		return nil
 	}
 
 	var returned int
 	var aborted, failed, skipped []string
 	for _, wt := range targets {
-		fmt.Fprintf(os.Stderr, "🌳 Returning %s (%s) at %s\n", wt.Name, wt.Status, ui.PrettyPath(wt.Path))
+		fmt.Fprintf(os.Stderr, "Returning %s (%s) at %s\n", wt.Name, wt.Status, ui.PrettyPath(wt.Path))
 		err := releaseWorktree(returnTarget{path: wt.Path, poolDir: poolDir}, bulkReturnPreconditions(wt))
 		switch {
 		case err == nil:
@@ -314,7 +314,7 @@ func returnHeldWorktrees() error {
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "🌳 Returned %d of %d held worktree(s); %d skipped; %d not held.\n",
+	fmt.Fprintf(os.Stderr, "Returned %d of %d held worktree(s); %d skipped; %d not held.\n",
 		returned, len(targets)+recovered, len(skipped)+recovered, notHeld)
 
 	// A failure outranks an abort: retrying is the right response to a failure
@@ -325,7 +325,7 @@ func returnHeldWorktrees() error {
 	}
 	if len(aborted) > 0 {
 		return withExitCode(ExitNotReturned, fmt.Errorf(
-			"🌳 worktree(s) %s not returned: they have uncommitted changes and cleaning was declined or could not be confirmed; prune will not reclaim those slots. Use treehouse return --all --force to clean and return them",
+			"worktree(s) %s not returned: they have uncommitted changes and cleaning was declined or could not be confirmed; prune will not reclaim those slots. Use treehouse return --all --force to clean and return them",
 			strings.Join(aborted, ", ")))
 	}
 	return nil

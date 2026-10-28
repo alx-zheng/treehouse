@@ -349,7 +349,7 @@ func freeTemplatedSlot(repoRoot, poolDir string, state State, poolSize int, opts
 		if statErr != nil {
 			return "", "", statErr
 		}
-		fmt.Fprintf(os.Stderr, "🌳 Warning: skipped slot %s because its worktree path %s already exists.\n", name, wtPath)
+		fmt.Fprintf(os.Stderr, "Warning: skipped slot %s because its worktree path %s already exists.\n", name, wtPath)
 		occupied = append(occupied, wtPath)
 	}
 	return "", "", fmt.Errorf("every worktree path this pool would create already exists (%d checked, %s through %s); treehouse only creates a worktree at a path it can own and never adopts an existing directory. List this repository's worktrees with 'git worktree list' in %s and see the README section on recovering missing pool state to decide what to do with them",
@@ -414,10 +414,10 @@ func acquire(repoRoot, poolDir string, poolSize int, postCreate []string, opts a
 	// itself, so unique_leaf has nothing left to rename, and a pool that sets
 	// both would otherwise get whichever leaf the template happens to end with.
 	if opts.worktreePath != "" && opts.uniqueLeaf {
-		fmt.Fprintf(os.Stderr, "🌳 Warning: worktree_path is set, so unique_leaf is ignored - the template names every segment of the path. Write %s in it for a unique leaf.\n", placeholderRepo+"-"+placeholderSlot)
+		fmt.Fprintf(os.Stderr, "Warning: worktree_path is set, so unique_leaf is ignored - the template names every segment of the path. Write %s in it for a unique leaf.\n", placeholderRepo+"-"+placeholderSlot)
 	}
 
-	fmt.Fprintf(os.Stderr, "🌳 Setting up worktree...\n")
+	fmt.Fprintf(os.Stderr, "Setting up worktree...\n")
 	if !opts.skipFetch && vcs.HasRemote(repoRoot, "origin") {
 		if err := vcs.Fetch(repoRoot); err != nil {
 			return LeaseInfo{}, fmt.Errorf("fetch failed: %w", err)
@@ -1056,7 +1056,7 @@ func ReleaseConditional(poolDir, worktreePath, baseBranch string, preconditions 
 			}
 		}
 		if !wt.SeedInventoryKnown {
-			fmt.Fprintf(os.Stderr, "🌳 Warning: %s was recovered without a trusted record of the ignored files treehouse seeded into it; any such files are not cleaned up and remain in the worktree.\n", worktreePath)
+			fmt.Fprintf(os.Stderr, "Warning: %s was recovered without a trusted record of the ignored files treehouse seeded into it; any such files are not cleaned up and remain in the worktree.\n", worktreePath)
 		}
 		if !markerless {
 			seededPaths := wt.SeededPaths
@@ -1070,7 +1070,7 @@ func ReleaseConditional(poolDir, worktreePath, baseBranch string, preconditions 
 				if fallback == "" || fallback == branch {
 					return err
 				}
-				fmt.Fprintf(os.Stderr, "🌳 Warning: cannot park the worktree on %q (%v); using %s instead.\n", branch, err, fallback)
+				fmt.Fprintf(os.Stderr, "Warning: cannot park the worktree on %q (%v); using %s instead.\n", branch, err, fallback)
 				if err := vcs.ResetWorktreeWithSeededPaths(worktreePath, fallback, seededPaths); err != nil {
 					return err
 				}

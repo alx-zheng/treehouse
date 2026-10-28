@@ -177,7 +177,7 @@ func getRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(os.Stderr, "🌳 Entered worktree at %s. Type 'exit' to return.\n", ui.PrettyPath(wtPath))
+	fmt.Fprintf(os.Stderr, "Entered worktree at %s. Type 'exit' to return.\n", ui.PrettyPath(wtPath))
 
 	env := []string{
 		"TREEHOUSE_DIR=" + wtPath,
@@ -206,15 +206,15 @@ func getRunE(cmd *cobra.Command, args []string) error {
 		return nil
 	}); err != nil {
 		if errors.Is(err, pool.ErrOwnerPreconditionFailed) {
-			fmt.Fprintf(os.Stderr, "🌳 Not returning %s to the pool: %v; leaving it exactly as it is.\n", ui.PrettyPath(wtPath), err)
+			fmt.Fprintf(os.Stderr, "Not returning %s to the pool: %v; leaving it exactly as it is.\n", ui.PrettyPath(wtPath), err)
 			return nil
 		}
-		fmt.Fprintf(os.Stderr, "🌳 Warning: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
 	}
 
 	dirty, _ := vcs.IsDirty(wtPath)
 	if dirty {
-		fmt.Fprintf(os.Stderr, "🌳 Worktree has uncommitted changes.\n")
+		fmt.Fprintf(os.Stderr, "Worktree has uncommitted changes.\n")
 
 		ok, promptErr := ui.Confirm("Clean worktree and return to pool?", true)
 		if promptErr != nil || !ok {
@@ -225,20 +225,20 @@ func getRunE(cmd *cobra.Command, args []string) error {
 			// never this session's to return - not returning it is the
 			// designed outcome.
 			return withExitCode(ExitNotReturned, fmt.Errorf(
-				"🌳 worktree left dirty and not returned to the pool; prune will not reclaim this slot. Use treehouse return --force %s to clean it later",
+				"worktree left dirty and not returned to the pool; prune will not reclaim this slot. Use treehouse return --force %s to clean it later",
 				quoteReturnPath(wtPath)))
 		}
 	}
 
 	if err := returnWorktreeToPool(poolDir, wtPath, releaseBaseBranch(repoRoot, cfg), ownReservation); err != nil {
 		if errors.Is(err, pool.ErrOwnerPreconditionFailed) {
-			fmt.Fprintf(os.Stderr, "🌳 Not returning %s to the pool: %v; leaving it exactly as it is.\n", ui.PrettyPath(wtPath), err)
+			fmt.Fprintf(os.Stderr, "Not returning %s to the pool: %v; leaving it exactly as it is.\n", ui.PrettyPath(wtPath), err)
 			return nil
 		}
-		fmt.Fprintf(os.Stderr, "🌳 Warning: %v; leaving worktree in place.\n", err)
+		fmt.Fprintf(os.Stderr, "Warning: %v; leaving worktree in place.\n", err)
 		return err
 	}
-	fmt.Fprintln(os.Stderr, "🌳 Worktree returned to pool.")
+	fmt.Fprintln(os.Stderr, "Worktree returned to pool.")
 
 	return nil
 }
@@ -286,7 +286,7 @@ func releaseBaseBranch(repoRoot string, cfg config.Config) string {
 		return ""
 	}
 	if err := vcs.VerifyBaseBranch(repoRoot, cfg.BaseBranch); err != nil {
-		fmt.Fprintf(os.Stderr, "🌳 Warning: cannot return the worktree to base branch %q (%v); using the repository default instead.\n", cfg.BaseBranch, err)
+		fmt.Fprintf(os.Stderr, "Warning: cannot return the worktree to base branch %q (%v); using the repository default instead.\n", cfg.BaseBranch, err)
 		return ""
 	}
 	return cfg.BaseBranch
@@ -306,7 +306,7 @@ func getLeaseRunE(repoRoot, poolDir string, cfg config.Config, options pool.Acqu
 		return err
 	}
 
-	fmt.Fprintf(os.Stderr, "🌳 Leased worktree at %s. Run 'treehouse return %s' to release it.\n",
+	fmt.Fprintf(os.Stderr, "Leased worktree at %s. Run 'treehouse return %s' to release it.\n",
 		ui.PrettyPath(lease.Path), ui.PrettyPath(lease.Path))
 	if getJSON {
 		return json.NewEncoder(os.Stdout).Encode(lease)
@@ -338,7 +338,7 @@ func killLingeringProcesses(wtPath string) error {
 		for i, p := range killed {
 			names[i] = p.String()
 		}
-		fmt.Fprintf(os.Stderr, "🌳 Terminated lingering processes: %s\n", strings.Join(names, ", "))
+		fmt.Fprintf(os.Stderr, "Terminated lingering processes: %s\n", strings.Join(names, ", "))
 	}
 
 	survivors, err := unprotectedProcessesInWorktree(wtPath)

@@ -71,7 +71,7 @@ func leaseRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(os.Stderr, "🌳 Leased worktree %s at %s. Run 'treehouse return %s' to release it.\n",
+	fmt.Fprintf(os.Stderr, "Leased worktree %s at %s. Run 'treehouse return %s' to release it.\n",
 		args[0], ui.PrettyPath(lease.Path), ui.PrettyPath(lease.Path))
 	if leaseJSONFlag {
 		return json.NewEncoder(os.Stdout).Encode(lease)

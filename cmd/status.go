@@ -77,7 +77,7 @@ var statusCmd = &cobra.Command{
 		fmt.Fprintln(os.Stdout, baseBranchLine(repoRoot, cfg, yellow))
 
 		if len(worktrees) == 0 {
-			fmt.Fprintln(os.Stderr, "🌳 No worktrees in pool.")
+			fmt.Fprintln(os.Stderr, "No worktrees in pool.")
 			return nil
 		}
 
